@@ -1,0 +1,13 @@
+experimental/
+.ipynb_checkpoints/
+__pycache__/
+images/
+TODO/
+logs/
+experiments/*
+.idea/
+!.gitignore
+./data
+./mapping_data
+data
+mapping_data

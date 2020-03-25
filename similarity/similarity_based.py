@@ -8,7 +8,7 @@ import torch.nn.functional as F
 class AffinityFieldLoss(nn.Module):
     '''
         loss proposed in the paper: https://arxiv.org/abs/1803.10335
-        used for sigmentation tasks
+        used for segmentation tasks
 
         after: https://github.com/CoinCheung/pytorch-loss/blob/master/affinity_loss.py
     '''
@@ -27,6 +27,7 @@ class AffinityFieldLoss(nn.Module):
             lbls = torch.flatten(labels, start_dim=1, end_dim=2)
         ignore_mask = lbls.cpu() == self.ignore_lb
         n_valid = ignore_mask.numel() - ignore_mask.sum().item()
+        print(f'n_valid: {n_valid}')
         indices = [
             # center,               # edge
             ((1, None, None, None), (None, -1, None, None)),  # up

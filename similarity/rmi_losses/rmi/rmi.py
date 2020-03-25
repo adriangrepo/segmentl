@@ -33,7 +33,7 @@ class RMILoss(nn.Module):
 	"""
 	region mutual information
 	I(A, B) = H(A) + H(B) - H(A, B)
-	This version need a lot of memory if do not dwonsample.
+	Memory intensive without downsampling.
 	"""
 	def __init__(self,
 					num_classes=21,
@@ -64,6 +64,7 @@ class RMILoss(nn.Module):
 		self.kernel_padding = self.rmi_pool_size // 2
 		# ignore class
 		self.ignore_index = 255
+		print(f'<<RMILoss.init() num_classes: {self.num_classes}, rmi_pool_size: {self.rmi_pool_size}')
 
 	def forward(self, logits_4D, labels_3D):
 		loss = self.forward_sigmoid(logits_4D, labels_3D)
@@ -78,6 +79,7 @@ class RMILoss(nn.Module):
 			labels_3D 	:	[N, H, W], dtype=long
 		"""
 		# label mask -- [N, H, W, 1]
+		print(f'>>forward_sigmoid labels_4D: {logits_4D.shape}, labels_3D: {labels_3D.shape}')
 		label_mask_3D = labels_3D < self.num_classes
 
 		# valid label

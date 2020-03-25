@@ -4,9 +4,8 @@ from torch.autograd import Variable
 from torch import einsum
 import torch.nn.functional as F
 import numpy as np
-from segmentl.distribution.distribution_based import CrossentropyND, TopKLoss, WeightedCrossEntropyLoss
-from segmentl.utils import softmax_helper
-from segmentl.utils import get_tp_fp_fn, get_intersection_union, flatten, sum_tensor, softmax_helper, \
+from ..distribution.distribution_based import CrossentropyND, TopKLoss, WeightedCrossEntropyLoss
+from ..utils import get_tp_fp_fn, get_intersection_union, flatten, sum_tensor, softmax_helper, \
     get_activation_fn, mean, flatten_probas, flatten_binary_scores
 
 class IoULoss(nn.Module):
@@ -58,6 +57,7 @@ class TverskyLoss(nn.Module):
                  square=False):
         """
         paper: https://arxiv.org/pdf/1706.05721.pdf
+        α and β control the magnitude of penalties for FPs (mask false, pred true) and FNs (mask true, but pred false) espectively
         """
         super(TverskyLoss, self).__init__()
 
@@ -160,7 +160,8 @@ class FocalTverskyLoss(nn.Module):
     """
     def __init__(self, tversky_kwargs, gamma=4/3):
         super(FocalTverskyLoss, self).__init__()
-        assert(gamma>0, 'FocalTverskyLoss: gamma must be greater than zero')
+        if gamma<=0:
+            raise ValueError('FocalTverskyLoss: gamma must be greater than zero')
         self.gamma = gamma
         self.tversky = TverskyLoss(**tversky_kwargs)
 
@@ -585,6 +586,8 @@ class TotalError(nn.Module):
         self.apply_nonlin=apply_nonlin
         self.batch_loss=batch_loss
         self.do_bg=do_bg
+        #so dont divide by zero
+        self.epsilon=1e-7
 
     def forward(self, x, y, loss_mask=None):
         shp_x = x.shape
@@ -612,11 +615,45 @@ class TotalError(nn.Module):
                 loss = loss[:, 1:]
         #loss here is a 1D tensor of length batch
         #convert loss as fraction of pixels per image
-        loss=loss/(shp_x[2]*shp_x[3])
+        loss=loss/((shp_x[2]*shp_x[3])+self.epsilon)
         #average over the batch
         loss = loss.mean()
         #print(f'type(loss): {type(loss)}, loss: {loss} shape: {loss.shape}')
         return loss
+
+class CEDiceLoss(nn.Module):
+    # after https://github.com/JunMa11/SegLoss/tree/master/losses_pytorch
+    def __init__(self, soft_dice_kwargs, ce_kwargs, aggregate="sum"):
+        super(CEDiceLoss, self).__init__()
+        self.aggregate = aggregate
+        self.ce = CrossentropyND(**ce_kwargs)
+        self.dc = SoftDiceLoss(apply_nonlin=softmax_helper, **soft_dice_kwargs)
+
+    def forward(self, net_output, target):
+        dc_loss = self.dc(net_output, target)
+        ce_loss = self.ce(net_output, target)
+        if self.aggregate == "sum":
+            result = ce_loss + dc_loss
+        else:
+            raise NotImplementedError("aggregate != sum is not implemented")
+        return result
+
+class DiceTopKoss(nn.Module):
+    # after https://github.com/JunMa11/SegLoss/tree/master/losses_pytorch
+    def __init__(self, soft_dice_kwargs, ce_kwargs, aggregate="sum"):
+        super(DiceTopKoss, self).__init__()
+        self.aggregate = aggregate
+        self.ce = TopKLoss(**ce_kwargs)
+        self.dc = SoftDiceLoss(apply_nonlin=softmax_helper, **soft_dice_kwargs)
+
+    def forward(self, net_output, target):
+        dc_loss = self.dc(net_output, target)
+        ce_loss = self.ce(net_output, target)
+        if self.aggregate == "sum":
+            result = ce_loss + dc_loss
+        else:
+            raise NotImplementedError("aggregate != sum is not implemented")
+        return result
 
 #testing code
 def gen_sample():

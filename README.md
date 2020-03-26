@@ -17,3 +17,5 @@ The loss functions are grouped into broad categories: distance (eg Hausdorff), d
 region (eg Dice), and similarity (eg Structural Similarity) type losses.
 
 The code is alpha status.
+
+NB losses in experimental folders/scripts need testing/modification before use
